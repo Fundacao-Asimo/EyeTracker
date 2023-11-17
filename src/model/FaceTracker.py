@@ -16,6 +16,16 @@ class FaceTracker:
                  min_detection_confidence: float,
                  min_tracking_confidence: float,
                  image_shape: tuple):
+        """
+        Initialize a HandTracker instance.
+
+        Args:
+            model (str): The path to the model for hand tracking.
+            num_faces (int): Maximum number of faces to detect.
+            min_detection_confidence (float): Minimum confidence value ([0.0, 1.0]) for successful face detection.
+            min_tracking_confidence (float): Minimum confidence value ([0.0, 1.0]) for successful face landmark tracking.
+            image_shape (tuple): The resolution of the webcam
+        """
         self.model = model
         self.image_shape = image_shape
         self.detector = self.initialize_detector(num_faces,
@@ -36,6 +46,17 @@ class FaceTracker:
                     unused_output_image,
                     timestamp_ms: int,
                     ):
+        """
+        Saves the result of the detection.
+
+        Args:
+            result (mediapipe.framework.formats.landmark_pb2.NormalizedLandmarkList): Result of the detection.
+            unused_output_image (mediapipe.framework.formats.image_frame.ImageFrame): Unused.
+            timestamp_ms (int): Timestamp of the detection.
+
+        Returns:
+            None
+        """
         if self.COUNTER % self.fps_avg_frame_count == 0:
             self.FPS = self.fps_avg_frame_count / (time.time() - self.START_TIME)
             self.START_TIME = time.time()
@@ -47,6 +68,17 @@ class FaceTracker:
                             min_detection_confidence: float,
                             min_tracking_confidence: float,
                             ):
+        """
+        Initializes the HandLandmarker instance.
+
+        Args:
+            num_faces (int): Maximum number of faces to detect.
+            min_detection_confidence (float): Minimum confidence value ([0.0, 1.0]) for face detection to be considered successful.
+            min_tracking_confidence (float): Minimum confidence value ([0.0, 1.0]) for the face landmarks to be considered tracked successfully.
+
+        Returns:
+            mediapipe.HandLandmarker: HandLandmarker instance.
+        """
         base_options = python.BaseOptions(model_asset_path = self.model)
         options = vision.FaceLandmarkerOptions(base_options = base_options,
                                                running_mode = vision.RunningMode.LIVE_STREAM,
@@ -63,6 +95,18 @@ class FaceTracker:
                        font_size: int = 1,
                        font_thickness: int = 1,
                        ) -> np.ndarray:
+        """
+        Draws the landmarks and handedness on the image.
+
+        Args:
+            image (numpy.ndarray): Image on which to draw the landmarks.
+            text_color (tuple, optional): Color of the text. Defaults to (0, 0, 0).
+            font_size (int, optional): Size of the font. Defaults to 1.
+            font_thickness (int, optional): Thickness of the font. Defaults to 1.
+
+        Returns:
+            numpy.ndarray: Image with the landmarks drawn.
+        """
         fps_text = "FPS = {:.1f}".format(self.FPS)
         cv2.putText(image,
                     fps_text,
@@ -95,6 +139,16 @@ class FaceTracker:
                frame: np.ndarray,
                draw: bool = False,
                ) -> np.ndarray:
+        """
+        Detects hands in the image.
+
+        Args:
+            frame (numpy.ndarray): Image in which to detect the hands.
+            draw (bool, optional): Whether to draw the landmarks on the image. Defaults to False.
+
+        Returns:
+            numpy.ndarray: Image with the landmarks drawn if draw is True, else the original image.
+        """
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format = mp.ImageFormat.SRGB, data = rgb_image)
         self.detector.detect_async(mp_image, time.time_ns() // 1_000_000)
@@ -105,6 +159,15 @@ class FaceTracker:
                   rect_color: tuple = (255, 51, 51),
                   text_color: tuple = (0, 128, 255),
                   ) -> np.ndarray:
+        """
+        Draw a rectangle and servo angle information on the image.
+
+        Args:
+            image (np.ndarray): The image to draw on.
+            rect_color (tuple): The color of the rectangle.
+            text_color (tuple): The color of the text.
+        """
+
         # Get the height and width of the image
         height, width = self.image_shape
 
