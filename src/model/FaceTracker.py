@@ -130,8 +130,8 @@ class FaceTracker:
                                                landmark_list = face_landmarks_proto,
                                                connections = self.mp_face_mesh.FACEMESH_IRISES,
                                                landmark_drawing_spec = None,
-                                               connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_tesselation_style()
-                                               # connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_iris_connections_style()
+                                               # connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_tesselation_style()
+                                               connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_iris_connections_style()
                                                )
         return image
 
@@ -243,9 +243,9 @@ class FaceTracker:
                     2,
                     )
         if left_iris_ratio > 0.45 and right_iris_ratio > 0.45:
-            fps_text = "Blinked!"
+            text = "Blinked!"
             cv2.putText(image,
-                        fps_text,
+                        text,
                         (24, 60),
                         cv2.FONT_HERSHEY_DUPLEX,
                         1,
