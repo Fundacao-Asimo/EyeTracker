@@ -128,11 +128,17 @@ class FaceTracker:
                 ])
                 self.mp_drawing.draw_landmarks(image = image,
                                                landmark_list = face_landmarks_proto,
-                                               connections = self.mp_face_mesh.FACEMESH_IRISES,
+                                               connections = self.mp_face_mesh.FACEMESH_FACE_OVAL,
                                                landmark_drawing_spec = None,
-                                               # connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_tesselation_style()
-                                               connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_iris_connections_style()
+                                               connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_contours_style()
                                                )
+                # self.mp_drawing.draw_landmarks(image = image,
+                #                                landmark_list = face_landmarks_proto,
+                #                                connections = self.mp_face_mesh.FACEMESH_IRISES,
+                #                                landmark_drawing_spec = None,
+                #                                # connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_tesselation_style()
+                #                                connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_iris_connections_style()
+                #                                )
         return image
 
     def detect(self,
@@ -172,12 +178,12 @@ class FaceTracker:
         height, width = self.image_shape
 
         # Define origin point and rectangle size
-        x1, y1 = int(width * 0.021), int(height * 0.5)
-        w, h = 300, 150
+        x1, y1 = int(width * 0.021), int(height * 0.63)
+        w, h = 410, 60
         x2, y2 = x1 + w, y1 + h
 
         # Draw the rectangle with rounded corners
-        r, d, thickness = 20, 20, 3
+        r, d, thickness = 10, 10, 3
         # Top left
         cv2.line(image, (x1 + r, y1), (x1 + r + d, y1), rect_color, thickness)
         cv2.line(image, (x1, y1 + r), (x1, y1 + r + d), rect_color, thickness)
@@ -196,9 +202,22 @@ class FaceTracker:
         cv2.ellipse(image, (x2 - r, y2 - r), (r, r), 0, 0, 90, rect_color, thickness)
 
         # Set the initial position of the text inside the rectangle
-        text_x, text_y = x1 + int(w * 0.09), y1 + int(h * 0.25)
+        text_x, text_y = x1 + int(w * 0.04), y1 + int(h * 0.63)
+
         # Write each line of text on the image
 
+        nose_position = self.DETECTION_RESULT.face_landmarks[0][168]
+
+        cv2.putText(image,
+                    f"Nose position: ({nose_position.x * self.image_shape[0]:.2f}; {nose_position.y * self.image_shape[1]:.2f})",
+                    (text_x, text_y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.75,
+                    text_color,
+                    2,
+                    )
+
+        """
         # First info
         left_iris_pos = self.DETECTION_RESULT.face_landmarks[0][473]
         cv2.putText(image,
@@ -253,4 +272,5 @@ class FaceTracker:
                         1,
                         cv2.LINE_AA,
                         )
+        """
         return image

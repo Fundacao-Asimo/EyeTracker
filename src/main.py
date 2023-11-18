@@ -11,7 +11,7 @@ os.sys.path.insert(0, root_dir)
 def main():
     image_shape = (640, 480)
     model = os.path.join(root_dir, "res", "face_landmarker.task")
-    face = FaceTracker(model, 1, 0.5, 0.7, image_shape)
+    face = FaceTracker(model, 1, 0.5, 0.75, image_shape)
     cap = cv2.VideoCapture(0)
     while cap.isOpened():
         success, image = cap.read()
