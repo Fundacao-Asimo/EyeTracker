@@ -1,164 +1,217 @@
+import mediapipe as mp
+import numpy as np
+
 import time
 import cv2
 
-import numpy as np
-import mediapipe as mp
-
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 from mediapipe.framework.formats import landmark_pb2
+from mediapipe.tasks.python import vision
+from mediapipe.tasks import python
 
 
 class FaceTracker:
+    """
+        Class to track the face using MediaPipe FaceMesh
+
+        Attributes:
+            model_path (str): The path to the model file
+            detector (vision.FaceLandmarker): The face detector
+            image_shape (tuple): The resolution of the webcam
+            mp_face_mesh (mp.solutions.face_mesh): The MediaPipe FaceMesh instance
+            mp_drawing (mp.solutions.drawing_utils): The MediaPipe drawing utilities
+            mp_drawing_styles (mp.solutions.drawing_styles): The MediaPipe drawing styles
+            fps_avg_frame_counter (int): The frame counter for calculating the FPS
+            COUNTER (int): The frame counter
+            FPS (int): The FPS
+            START_TIME (float): The start time
+            DETECTION_RESULT (landmark_pb2.NormalizedLandmarkList): The detection result
+
+        Methods:
+            __init__(model_path, num_faces, min_detection_confidence, min_tracking_confidence, image_shape): Initialize the FaceTracker class
+            save_result(result, timestamp_ms, unused_output_image): Save the detection result
+            initialize_detector(num_faces, min_detection_confidence, min_tracking_confidence): Initialize the face detector
+            get_face_landmarks(idxs): Get the face landmarks
+            draw_landmarks(image, text_color, font_size, font_thickness): Draw the landmarks on the image
+            detect(image, draw): Detect the face in the frame
+            draw_info(image, rect_color, text_color): Draw a rectangle with the face information on the image
+    """
+
     def __init__(self,
-                 model: str,
+                 model_path: str,
                  num_faces: int,
                  min_detection_confidence: float,
                  min_tracking_confidence: float,
-                 image_shape: tuple):
+                 image_shape: tuple) -> None:
         """
-        Initialize a HandTracker instance.
+            Initialize the FaceTracker class.
 
-        Args:
-            model (str): The path to the model for hand tracking.
-            num_faces (int): Maximum number of faces to detect.
-            min_detection_confidence (float): Minimum confidence value ([0.0, 1.0]) for successful face detection.
-            min_tracking_confidence (float): Minimum confidence value ([0.0, 1.0]) for successful face landmark tracking.
-            image_shape (tuple): The resolution of the webcam
+            Args:
+                model_path (str): The path to the model file
+                num_faces (int): The number of faces to detect
+                min_detection_confidence (float): The minimum confidence to detect a face
+                min_tracking_confidence (float): The minimum confidence to track a face
+                image_shape (tuple): The resolution of the webcam
+
+            Returns:
+                None
         """
-        self.model = model
-        self.image_shape = image_shape
+
+        self.model_path = model_path
         self.detector = self.initialize_detector(num_faces,
                                                  min_detection_confidence,
-                                                 min_tracking_confidence,
+                                                 min_tracking_confidence
                                                  )
+        self.image_shape = image_shape
         self.mp_face_mesh = mp.solutions.face_mesh
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_drawing_styles = mp.solutions.drawing_styles
-        self.fps_avg_frame_count = 30
+        self.fps_avg_frame_counter = 30
         self.COUNTER = 0
         self.FPS = 0
         self.START_TIME = time.time()
         self.DETECTION_RESULT = None
 
+    # noinspection PyUnusedLocal
     def save_result(self,
                     result: landmark_pb2.NormalizedLandmarkList,
-                    unused_output_image,
-                    timestamp_ms: int,
-                    ):
+                    unused_timestamp_ms: int,
+                    unused_output_image) -> None:
         """
-        Saves the result of the detection.
+            Save the detection result
 
-        Args:
-            result (mediapipe.framework.formats.landmark_pb2.NormalizedLandmarkList): Result of the detection.
-            unused_output_image (mediapipe.framework.formats.image_frame.ImageFrame): Unused.
-            timestamp_ms (int): Timestamp of the detection.
+            Args:
+                result (landmark_pb2.NormalizedLandmarkList): The detection result
+                unused_timestamp_ms (int): Unused timestamp of the detection
+                unused_output_image: Unused output image
 
-        Returns:
-            None
+            Returns:
+                None
         """
-        if self.COUNTER % self.fps_avg_frame_count == 0:
-            self.FPS = self.fps_avg_frame_count / (time.time() - self.START_TIME)
+
+        if self.COUNTER % self.fps_avg_frame_counter == 0:
+            self.FPS = self.fps_avg_frame_counter / (time.time() - self.START_TIME)
             self.START_TIME = time.time()
-        self.DETECTION_RESULT = result
+
+        self.DETECTION_RESULT = result if len(result.face_landmarks) else None
         self.COUNTER += 1
+
+        return None
 
     def initialize_detector(self,
                             num_faces: int,
                             min_detection_confidence: float,
-                            min_tracking_confidence: float,
-                            ):
+                            min_tracking_confidence: float) -> vision.FaceLandmarker:
         """
-        Initializes the HandLandmarker instance.
+            Initialize the face detector
 
-        Args:
-            num_faces (int): Maximum number of faces to detect.
-            min_detection_confidence (float): Minimum confidence value ([0.0, 1.0]) for face detection to be considered successful.
-            min_tracking_confidence (float): Minimum confidence value ([0.0, 1.0]) for the face landmarks to be considered tracked successfully.
+            Args:
+                num_faces (int): The number of faces to detect
+                min_detection_confidence (float): The minimum confidence to detect a face
+                min_tracking_confidence (float): The minimum confidence to track a face
 
         Returns:
-            mediapipe.HandLandmarker: HandLandmarker instance.
+            mediapipe.FaceLandmarker: FaceLandmarker instance
         """
-        base_options = python.BaseOptions(model_asset_path = self.model)
+
+        base_options = python.BaseOptions(model_asset_path = self.model_path)
         options = vision.FaceLandmarkerOptions(base_options = base_options,
                                                running_mode = vision.RunningMode.LIVE_STREAM,
                                                num_faces = num_faces,
                                                min_face_detection_confidence = min_detection_confidence,
                                                min_tracking_confidence = min_tracking_confidence,
                                                output_face_blendshapes = True,
-                                               result_callback = self.save_result)
+                                               result_callback = self.save_result
+                                               )
+
         return vision.FaceLandmarker.create_from_options(options)
+
+    def get_face_landmarks(self,
+                           idxs: list = None) -> list:
+        """
+            Get the face landmarks
+
+            Args:
+                idxs (list): The indices of the landmarks to get
+
+            Returns:
+                list: The face landmarks
+        """
+
+        if self.DETECTION_RESULT:
+            return [self.DETECTION_RESULT.face_landmarks[0][idx] for idx in idxs]
+        return []
 
     def draw_landmarks(self,
                        image: np.ndarray,
                        text_color: tuple = (255, 255, 255),
                        font_size: int = 1,
-                       font_thickness: int = 1,
-                       ) -> np.ndarray:
+                       font_thickness: int = 1) -> np.ndarray:
         """
-        Draws the landmarks and handedness on the image.
+            Draw the landmarks on the image
 
-        Args:
-            image (numpy.ndarray): Image on which to draw the landmarks.
-            text_color (tuple, optional): Color of the text. Defaults to (0, 0, 0).
-            font_size (int, optional): Size of the font. Defaults to 1.
-            font_thickness (int, optional): Thickness of the font. Defaults to 1.
+            Args:
+                image (np.ndarray): The image to draw the landmarks on
+                text_color (tuple): The color of the text
+                font_size (int): The size of the font
+                font_thickness (int): The thickness of the font
 
-        Returns:
-            numpy.ndarray: Image with the landmarks drawn.
+            Returns:
+                np.ndarray: The image with the landmarks drawn
         """
-        fps_text = "FPS = {:.1f}".format(self.FPS)
-        cv2.putText(image,
-                    fps_text,
-                    (24, 30),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    font_size,
-                    text_color,
-                    font_thickness,
-                    cv2.LINE_AA,
+
+        fps_text = "FPS: {:.1f}".format(self.FPS)
+        cv2.putText(img = image,
+                    text = fps_text,
+                    org = (24, 30),
+                    fontFace = cv2.FONT_HERSHEY_DUPLEX,
+                    fontScale = font_size,
+                    color = text_color,
+                    thickness = font_thickness,
+                    lineType = cv2.LINE_AA
                     )
+
         if self.DETECTION_RESULT:
+
             for face_landmarks in self.DETECTION_RESULT.face_landmarks:
                 face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
-                face_landmarks_proto.landmark.extend([
-                    landmark_pb2.NormalizedLandmark(x = landmark.x,
-                                                    y = landmark.y,
-                                                    z = landmark.z
-                                                    ) for landmark in face_landmarks
-                ])
-                self.mp_drawing.draw_landmarks(image = image,
+                face_landmarks_proto.landmark.extend([landmark_pb2.NormalizedLandmark(x = landmark.x,
+                                                                                      y = landmark.y,
+                                                                                      z = landmark.z) for landmark in face_landmarks])
+                self.mp_drawing.draw_landmarks(image,
                                                landmark_list = face_landmarks_proto,
                                                connections = self.mp_face_mesh.FACEMESH_FACE_OVAL,
-                                               landmark_drawing_spec = None,
-                                               connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_contours_style()
+                                               connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_contours_style(),
+                                               landmark_drawing_spec = None
                                                )
-                # self.mp_drawing.draw_landmarks(image = image,
-                #                                landmark_list = face_landmarks_proto,
-                #                                connections = self.mp_face_mesh.FACEMESH_IRISES,
-                #                                landmark_drawing_spec = None,
-                #                                # connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_tesselation_style()
-                #                                connection_drawing_spec = mp.solutions.drawing_styles.get_default_face_mesh_iris_connections_style()
-                #                                )
+
         return image
 
     def detect(self,
-               frame: np.ndarray,
-               draw: bool = False,
+               image: np.ndarray,
+               draw: bool = False
                ) -> np.ndarray:
         """
-        Detects hands in the image.
+            Detect the face in the frame
 
-        Args:
-            frame (numpy.ndarray): Image in which to detect the hands.
-            draw (bool, optional): Whether to draw the landmarks on the image. Defaults to False.
+            Args:
+                image (np.ndarray): The frame to detect the face in
+                draw (bool): Whether to draw the landmarks on the frame
 
-        Returns:
-            numpy.ndarray: Image with the landmarks drawn if draw is True, else the original image.
+            Returns:
+                np.ndarray: Image with the landmarks drawn if draw is True, else the original image
         """
-        rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format = mp.ImageFormat.SRGB, data = rgb_image)
-        self.detector.detect_async(mp_image, time.time_ns() // 1_000_000)
-        return self.draw_landmarks(frame) if draw else frame
+
+        rgb_image = cv2.cvtColor(src = image,
+                                 code = cv2.COLOR_BGR2RGB
+                                 )
+        mp_image = mp.Image(image_format = mp.ImageFormat.SRGB,
+                            data = rgb_image
+                            )
+        self.detector.detect_async(image = mp_image,
+                                   timestamp_ms = time.time_ns() // 1_000_000
+                                   )
+
+        return self.draw_landmarks(image = image) if draw else image
 
     def draw_info(self,
                   image: np.ndarray,
@@ -166,111 +219,129 @@ class FaceTracker:
                   text_color: tuple = (0, 128, 255),
                   ) -> np.ndarray:
         """
-        Draw a rectangle and servo angle information on the image.
+            Draw a rectangle with the face information on the image
 
-        Args:
-            image (np.ndarray): The image to draw on.
-            rect_color (tuple): The color of the rectangle.
-            text_color (tuple): The color of the text.
+            Args:
+                image (np.ndarray): The image to draw on
+                rect_color (tuple): The color of the rectangle
+                text_color (tuple): The color of the text
+
+            Returns:
+                np.ndarray: The image with the rectangle and text drawn
         """
 
-        # Get the height and width of the image
         height, width = self.image_shape
 
-        # Define origin point and rectangle size
-        x1, y1 = int(width * 0.021), int(height * 0.63)
+        # Define the rectangle coordinates
         w, h = 410, 60
+        x1, y1 = int(width * 0.021), int(height * 0.63)
         x2, y2 = x1 + w, y1 + h
 
         # Draw the rectangle with rounded corners
-        r, d, thickness = 10, 10, 3
+        radius, offset, thickness = 10, 10, 3
+
         # Top left
-        cv2.line(image, (x1 + r, y1), (x1 + r + d, y1), rect_color, thickness)
-        cv2.line(image, (x1, y1 + r), (x1, y1 + r + d), rect_color, thickness)
-        cv2.ellipse(image, (x1 + r, y1 + r), (r, r), 180, 0, 90, rect_color, thickness)
+        cv2.line(img = image,
+                 pt1 = (x1 + radius, y1),
+                 pt2 = (x1 + radius + offset, y1),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.line(img = image,
+                 pt1 = (x1, y1 + radius),
+                 pt2 = (x1, y1 + radius + offset),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.ellipse(img = image,
+                    center = (x1 + radius, y1 + radius),
+                    axes = (radius, radius),
+                    angle = 180,
+                    startAngle = 0,
+                    endAngle = 90,
+                    color = rect_color,
+                    thickness = thickness
+                    )
+
         # Top right
-        cv2.line(image, (x2 - r, y1), (x2 - r - d, y1), rect_color, thickness)
-        cv2.line(image, (x2, y1 + r), (x2, y1 + r + d), rect_color, thickness)
-        cv2.ellipse(image, (x2 - r, y1 + r), (r, r), 270, 0, 90, rect_color, thickness)
+        cv2.line(img = image,
+                 pt1 = (x2 - radius, y1),
+                 pt2 = (x2 - radius - offset, y1),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.line(img = image,
+                 pt1 = (x2, y1 + radius),
+                 pt2 = (x2, y1 + radius + offset),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.ellipse(img = image,
+                    center = (x2 - radius, y1 + radius),
+                    axes = (radius, radius),
+                    angle = 270,
+                    startAngle = 0,
+                    endAngle = 90,
+                    color = rect_color,
+                    thickness = thickness
+                    )
+
         # Bottom left
-        cv2.line(image, (x1 + r, y2), (x1 + r + d, y2), rect_color, thickness)
-        cv2.line(image, (x1, y2 - r), (x1, y2 - r - d), rect_color, thickness)
-        cv2.ellipse(image, (x1 + r, y2 - r), (r, r), 90, 0, 90, rect_color, thickness)
+        cv2.line(img = image,
+                 pt1 = (x1 + radius, y2),
+                 pt2 = (x1 + radius + offset, y2),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.line(img = image,
+                 pt1 = (x1, y2 - radius),
+                 pt2 = (x1, y2 - radius - offset),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.ellipse(img = image,
+                    center = (x1 + radius, y2 - radius),
+                    axes = (radius, radius),
+                    angle = 90,
+                    startAngle = 0,
+                    endAngle = 90,
+                    color = rect_color,
+                    thickness = thickness
+                    )
+
         # Bottom right
-        cv2.line(image, (x2 - r, y2), (x2 - r - d, y2), rect_color, thickness)
-        cv2.line(image, (x2, y2 - r), (x2, y2 - r - d), rect_color, thickness)
-        cv2.ellipse(image, (x2 - r, y2 - r), (r, r), 0, 0, 90, rect_color, thickness)
+        cv2.line(img = image,
+                 pt1 = (x2 - radius, y2),
+                 pt2 = (x2 - radius - offset, y2),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.line(img = image,
+                 pt1 = (x2, y2 - radius),
+                 pt2 = (x2, y2 - radius - offset),
+                 color = rect_color,
+                 thickness = thickness
+                 )
+        cv2.ellipse(img = image,
+                    center = (x2 - radius, y2 - radius),
+                    axes = (radius, radius),
+                    angle = 0,
+                    startAngle = 0,
+                    endAngle = 90,
+                    color = rect_color,
+                    thickness = thickness
+                    )
 
-        # Set the initial position of the text inside the rectangle
+        # Draw the text
         text_x, text_y = x1 + int(w * 0.04), y1 + int(h * 0.63)
-
-        # Write each line of text on the image
-
         nose_position = self.DETECTION_RESULT.face_landmarks[0][168]
-
-        cv2.putText(image,
-                    f"Nose position: ({nose_position.x * self.image_shape[0]:.2f}; {nose_position.y * self.image_shape[1]:.2f})",
-                    (text_x, text_y),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.75,
-                    text_color,
-                    2,
+        cv2.putText(img = image,
+                    text = f'Nose position: ({nose_position.x * self.image_shape[0]:.2f}, {nose_position.y * self.image_shape[1]:.2f})',
+                    org = (text_x, text_y),
+                    fontFace = cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale = 0.75,
+                    color = text_color,
+                    thickness = 2
                     )
 
-        """
-        # First info
-        left_iris_pos = self.DETECTION_RESULT.face_landmarks[0][473]
-        cv2.putText(image,
-                    f"Left iris: ({left_iris_pos.x * self.image_shape[0]:.2f}; {left_iris_pos.y * self.image_shape[1]:.2f})",
-                    (text_x, text_y),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    text_color,
-                    2,
-                    )
-
-        # Second info
-        right_iris_pos = self.DETECTION_RESULT.face_landmarks[0][468]
-        cv2.putText(image,
-                    f"Right iris: ({right_iris_pos.x * self.image_shape[0]:.2f}; {right_iris_pos.y * self.image_shape[1]:.2f})",
-                    (text_x, text_y + 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    text_color,
-                    2,
-                    )
-
-        # Third info
-        left_iris_ratio = self.DETECTION_RESULT.face_blendshapes[0][9].score
-        cv2.putText(image,
-                    f"Left eye ratio: {left_iris_ratio:.2f}",
-                    (text_x, text_y + 60),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    text_color,
-                    2,
-                    )
-
-        # Fourth info
-        right_iris_ratio = self.DETECTION_RESULT.face_blendshapes[0][10].score
-        cv2.putText(image,
-                    f"Right eye ratio: {right_iris_ratio:.2f}",
-                    (text_x, text_y + 90),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    text_color,
-                    2,
-                    )
-        if left_iris_ratio > 0.45 and right_iris_ratio > 0.45:
-            text = "Blinked!"
-            cv2.putText(image,
-                        text,
-                        (24, 60),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (255, 255, 255),
-                        1,
-                        cv2.LINE_AA,
-                        )
-        """
         return image
